@@ -1,0 +1,134 @@
+from flask import Flask, jsonify, request
+import sqlite3
+
+def init_db():
+    conn = sqlite3.connect("library_management.db")
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    
+    cursor.execute("""
+         CREATE TABLE IF NOT EXISTS author(
+             author_id INTEGER PRIMARY KEY AUTOINCREMENT,
+             author_name TEXT,
+             country TEXT      
+         )
+     """)
+    
+    
+    cursor.execute("""
+         CREATE TABLE IF NOT EXISTS books(
+             book_id INTEGER PRIMARY KEY AUTOINCREMENT,
+             title TEXT,
+             price INTEGER,
+             author_id INTEGER,
+             FOREIGN KEY (author_id) REFERENCES author (author_id)
+         )
+     """)
+    
+    cursor.execute("SELECT COUNT(*) FROM author")
+    if cursor.fetchone()[0] == 0:
+        cursor.execute("INSERT INTO author(author_name, country) VALUES('J.K. Rowling', 'UK')")
+        cursor.execute("INSERT INTO author(author_name, country) VALUES('George R.R. Martin', 'USA')")
+        cursor.execute("INSERT INTO books(title, price, author_id) VALUES('Harry Potter', 599, 1)")
+        cursor.execute("INSERT INTO books(title, price, author_id) VALUES('A Game of Thrones', 899, 2)")
+        
+    conn.commit()
+    conn.close()
+
+init_db()
+app = Flask(__name__)
+
+
+@app.route('/book/<int:id>', methods=["GET"])
+def get_book(id):
+   
+    conn = sqlite3.connect("library_management.db")
+    cursor = conn.cursor()
+    
+    
+    cursor.execute("""
+        SELECT books.book_id, books.title, books.price, author.author_name, author.country
+        FROM books
+        INNER JOIN author ON books.author_id = author.author_id
+        WHERE books.book_id = ?
+    """, (id,))
+    
+    result = cursor.fetchone()
+    conn.close()
+    
+    if result:
+        return jsonify({
+           "book_id": result[0],
+           "name": result[1],
+           "price": result[2],
+           "author": result[3],
+           "author's nationality": result[4]
+        }), 200
+        
+    
+    return jsonify({"error": "Book not found"}), 404
+
+
+@app.route('/author/add', methods=['POST'])
+def add_author():
+    incoming_data = request.json
+    author_name = incoming_data.get("author_name")
+    country = incoming_data.get("country", "Unknown")
+    
+    if not author_name:
+        return jsonify({"error": "Missing author_name"}), 400
+        
+    
+    conn = sqlite3.connect("library_management.db")
+    cursor = conn.cursor()
+    
+    try:
+        
+        cursor.execute("""
+            INSERT INTO author (author_name, country)
+            VALUES (?, ?)
+        """, (author_name, country))
+        conn.commit()
+        
+        new_author_id = cursor.lastrowid 
+        return jsonify({
+            "status": "Success", 
+            "message": "Author created successfully!",
+            "author_id": new_author_id 
+        }), 201
+    except sqlite3.IntegrityError:
+        return jsonify({"error": "Failed to add author"}), 400
+    finally:
+        conn.close()
+
+# --
+@app.route('/book/add', methods=['POST'])
+def add_book():
+    incoming_data = request.json
+    title = incoming_data.get("title")
+    price = incoming_data.get("price")
+    author_id = incoming_data.get("author_id") 
+    
+    if not title or not price or not author_id:
+        return jsonify({"error": "Missing parameters"}), 400
+        
+    
+    conn = sqlite3.connect("library_management.db")
+    cursor = conn.cursor()
+    cursor.execute("PRAGMA foreign_keys = ON;")
+    
+    try:
+        cursor.execute("""
+            INSERT INTO books (title, price, author_id)
+            VALUES (?, ?, ?)
+        """, (title, price, author_id))
+        conn.commit()
+        return jsonify({"status": "Success", "message": "Book saved successfully"}), 201
+    except sqlite3.IntegrityError:
+        # Enforces foreign key constraint checks
+        return jsonify({"error": "Foreign Key violation. That author_id does not exist."}), 400
+    finally:
+        conn.close()
+
+if __name__ == "__main__":
+    app.run(debug=True)
