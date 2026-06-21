@@ -2,7 +2,11 @@
 # 📚 Relational Library Management API
 
 A powerful, lightweight RESTful API built with **Flask** and **SQLite3** that implements a relational database structure. This project showcases the clean separation of data across parent-child tables, foreign key constraint enforcement, and optimized data aggregation using advanced SQL queries.
+---
 
+## 🧠 Fun Fact Matrix
+
+> **Behind the Code:** This entire relational backend engine, database schema, and API routing architecture was completely designed and engineered by me as an **8th grader** as a personal project to crush boredom and master advanced backend systems. 🚀
 ---
 
 ## 🚀 Features
